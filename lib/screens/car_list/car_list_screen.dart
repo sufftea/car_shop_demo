@@ -6,6 +6,7 @@ import 'package:car_shop/screens/car_list/widgets/car_card_content.dart';
 import 'package:car_shop/screens/car_list/widgets/timeline_widget.dart';
 import 'package:car_shop/utils/utils.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class CarListScreen extends ConsumerStatefulWidget {
@@ -72,7 +73,9 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
     if (draggableController.pixels >=
         (currentSize.isFinite ? currentSize.floor() : double.infinity)) {
       cardContentCtrl.forward();
-      cardOpenedNotifier.value = true;
+      WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+        cardOpenedNotifier.value = true;
+      });
     } else if (!cardContentCtrl.isDismissed) {
       final t = remap(
         cardFraction,
@@ -86,7 +89,9 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
 
       cardContentCtrl.value = t;
 
-      cardOpenedNotifier.value = false;
+      WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+        cardOpenedNotifier.value = false;
+      });
     }
   }
 
@@ -103,44 +108,50 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: LayoutBuilder(builder: (context, cons) {
-        cardFraction = CarCardWidget.contentHeight / cons.maxHeight;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.transparent,
+      ),
+      child: Scaffold(
+        body: LayoutBuilder(builder: (context, cons) {
+          cardFraction = CarCardWidget.contentHeight / cons.maxHeight;
 
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            buildTimeline(cons),
-            ...buildCardStack(cons),
-            buildFrontCard(cons),
-            AnimatedBuilder(
-              animation: swipeCtrl,
-              builder: (context, child) {
-                final t = swipeCtrl.value;
-                if (t <= 0) {
-                  return const SizedBox();
-                }
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              buildTimeline(cons),
+              ...buildCardStack(cons),
+              buildFrontCard(cons),
+              AnimatedBuilder(
+                animation: swipeCtrl,
+                builder: (context, child) {
+                  final t = swipeCtrl.value;
+                  if (t <= 0) {
+                    return const SizedBox();
+                  }
 
-                return buildSlidingCard(
-                  cons: cons,
-                  t: t - 1,
-                  child: Consumer(builder: (context, ref, child) {
-                    final year = ref.watch(yearProvider);
-                    return CarCardWidget(
-                      scrollController: dummyScrollController,
-                      draggableController: draggableController,
-                      contentAnim: dummyAnimation,
-                      cardFraction: cardFraction,
-                      year: year,
-                    );
-                  }),
-                );
-              },
-            ),
-            buildGestureDetector(cons),
-          ],
-        );
-      }),
+                  return buildSlidingCard(
+                    cons: cons,
+                    t: t - 1,
+                    child: Consumer(builder: (context, ref, child) {
+                      final year = ref.watch(yearProvider);
+                      return CarCardWidget(
+                        scrollController: dummyScrollController,
+                        draggableController: draggableController,
+                        contentAnim: dummyAnimation,
+                        cardFraction: cardFraction,
+                        year: year,
+                      );
+                    }),
+                  );
+                },
+              ),
+              buildGestureDetector(cons),
+            ],
+          );
+        }),
+      ),
     );
   }
 
@@ -184,7 +195,7 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
 
   Widget buildSlidingCard({
     required BoxConstraints cons,
-    required final t,
+    required double t,
     required Widget child,
   }) {
     final plusHeight = lerpDouble(

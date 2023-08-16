@@ -18,7 +18,7 @@ class CarCardWidget extends StatefulWidget {
     super.key,
   }) : carData = CarData.fromYear(year);
 
-  static const contentHeight = 550.0;
+  static const contentHeight = 600.0;
 
   final ScrollController scrollController;
   final DraggableScrollableController draggableController;
@@ -143,6 +143,7 @@ class _CarCardWidgetState extends State<CarCardWidget> {
                 },
                 border: Border(
                   bottom: BorderSide(
+                    width: 0.5,
                     color: Color.lerp(
                       Colors.transparent,
                       Colors.black,
@@ -163,7 +164,7 @@ class _CarCardWidgetState extends State<CarCardWidget> {
                     child: Center(
                       child: Container(
                         height: 4,
-                        width: 40,
+                        width: 30,
                         decoration: BoxDecoration(
                           color: Colors.grey,
                           borderRadius: BorderRadius.circular(2),
@@ -334,7 +335,7 @@ class _CarCardWidgetState extends State<CarCardWidget> {
           ),
           const Divider(
             height: 96,
-            thickness: 1,
+            thickness: 0.5,
             color: Colors.black,
           ),
           Padding(
