@@ -1,14 +1,13 @@
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:car_shop/screens/car_list/utils/providers.dart';
+import 'package:car_shop/screens/car_list/data/car_list.dart';
+import 'package:car_shop/screens/car_list/data/year_provider.dart';
 import 'package:car_shop/screens/car_list/widgets/car_card_content.dart';
 import 'package:car_shop/screens/car_list/widgets/timeline_widget.dart';
 import 'package:car_shop/utils/utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-const draggableMinSize = 0.6;
 
 class CarListScreen extends ConsumerStatefulWidget {
   const CarListScreen({
@@ -21,6 +20,10 @@ class CarListScreen extends ConsumerStatefulWidget {
 
 class _CarListScreenState extends ConsumerState<CarListScreen>
     with TickerProviderStateMixin {
+  static const cardStackOffset = 32.0;
+
+  final draggableSheetKey = GlobalKey();
+
   // DUMMIES
   final dummyDraggableController = DraggableScrollableController();
   final dummyScrollController = ScrollController();
@@ -41,7 +44,7 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
   );
   final cardOpenedNotifier = ValueNotifier(false);
 
-  final cardKeys = <int, GlobalKey>{};
+  double cardFraction = 0.0;
 
   @override
   void initState() {
@@ -58,25 +61,32 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
     draggableController.dispose();
     swipeCtrl.dispose();
     cardOpenedNotifier.dispose();
+
+    dummyAnimation.dispose();
+    dummyDraggableController.dispose();
+    dummyScrollController.dispose();
   }
 
   void onDraggableUpdate() {
+    final currentSize = draggableController.sizeToPixels(1);
+
     if (draggableController.pixels >=
-        draggableController.sizeToPixels(1).floor()) {
+        (currentSize.isFinite ? currentSize.floor() : double.infinity)) {
       cardContentCtrl.forward();
       cardOpenedNotifier.value = true;
     } else if (!cardContentCtrl.isDismissed) {
       final t = remap(
-        draggableMinSize,
+        cardFraction,
         1,
         0,
         1,
         draggableController.isAttached
             ? draggableController.size
-            : draggableMinSize,
+            : cardFraction,
       );
 
       cardContentCtrl.value = t;
+
       cardOpenedNotifier.value = false;
     }
   }
@@ -96,38 +106,53 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: LayoutBuilder(builder: (context, cons) {
+        cardFraction =
+            CarCardContentWidget.primaryContentHeight / cons.maxHeight;
+
         return Stack(
+          fit: StackFit.expand,
           children: [
-            buildTimeline(),
+            buildTimeline(cons),
             ...buildCardStack(cons),
             buildFrontCard(cons),
+            AnimatedBuilder(
+              animation: swipeCtrl,
+              builder: (context, child) {
+                final t = swipeCtrl.value;
+                if (t <= 0) {
+                  return const SizedBox();
+                }
+
+                return buildSlidingCard(
+                  cons: cons,
+                  t: t - 1,
+                  child: Consumer(builder: (context, ref, child) {
+                    final year = ref.watch(yearProvider);
+
+                    return CarCardWidget(
+                      scrollController: dummyScrollController,
+                      draggableController: draggableController,
+                      contentAnim: dummyAnimation,
+                      cardFraction: cardFraction,
+                      year: year,
+                    );
+                  }),
+                );
+              },
+            ),
+            buildGestureDetector(cons),
           ],
         );
       }),
     );
   }
 
-  Widget buildFrontCard(BoxConstraints cons) {
-    return AnimatedBuilder(
-      animation: swipeCtrl,
-      builder: (context, child) {
-        final plusHeight = lerpDouble(
-          0.0,
-          300.0,
-          swipeCtrl.value.abs(),
-        )!;
-        return Positioned(
-          bottom: -plusHeight * draggableMinSize,
-          left: cons.maxWidth * swipeCtrl.value,
-          width: cons.maxWidth,
-          height: cons.maxHeight + plusHeight,
-          child: Transform.rotate(
-            angle: -pi / 6 * swipeCtrl.value,
-            origin: const Offset(0, 0),
-            child: child!,
-          ),
-        );
-      },
+  Positioned buildGestureDetector(BoxConstraints cons) {
+    return Positioned(
+      bottom: 0,
+      right: 0,
+      left: 0,
+      height: CarCardContentWidget.primaryContentHeight,
       child: AnimatedBuilder(
         animation: cardOpenedNotifier,
         builder: (context, child) {
@@ -156,22 +181,127 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
             child: child,
           );
         },
-        child: DraggableScrollableSheet(
-          expand: false,
-          snap: true,
-          minChildSize: draggableMinSize,
-          initialChildSize: draggableMinSize,
-          // snapAnimationDuration: const Duration(milliseconds: 200),
-          controller: draggableController,
-          builder: (context, scrollController) {
-            cardScrollController = scrollController;
+      ),
+    );
+  }
+
+  Widget buildSlidingCard({
+    required BoxConstraints cons,
+    required final t,
+    required Widget child,
+  }) {
+    final plusHeight = lerpDouble(
+      0.0,
+      300.0,
+      t.abs(),
+    )!;
+
+    return Positioned(
+      bottom: -plusHeight,
+      left: cons.maxWidth * t,
+      width: cons.maxWidth,
+      height: CarCardContentWidget.primaryContentHeight + plusHeight,
+      child: Transform.rotate(
+        angle: pi / 8 * t,
+        origin: const Offset(0, 500),
+        child: child,
+      ),
+    );
+  }
+
+  Widget buildFrontCard(BoxConstraints cons) {
+    return AnimatedBuilder(
+      animation: swipeCtrl,
+      builder: (context, child) {
+        double t = swipeCtrl.value;
+
+        if (t == 0) {
+          return Positioned.fill(
+            child: child!,
+          );
+        }
+
+        final dummyChild = Consumer(builder: (context, ref, child) {
+          final year = ref.watch(yearProvider);
+
+          return CarCardWidget(
+            scrollController: dummyScrollController,
+            draggableController: dummyDraggableController,
+            contentAnim: dummyAnimation,
+            cardFraction: cardFraction,
+            year: year,
+          );
+        });
+
+        if (t > 0) {
+          return buildCardInStack(
+            cons: cons,
+            t: 1 - t / 3,
+            child: dummyChild,
+          );
+        }
+        return buildSlidingCard(
+          cons: cons,
+          t: t,
+          child: dummyChild,
+        );
+      },
+      child: DraggableScrollableSheet(
+        key: draggableSheetKey,
+        expand: false,
+        snap: true,
+        minChildSize: cardFraction,
+        initialChildSize: cardFraction,
+        snapAnimationDuration: const Duration(milliseconds: 200),
+        controller: draggableController,
+        builder: (context, scrollController) {
+          cardScrollController = scrollController;
+
+          return Consumer(builder: (context, ref, child) {
+            final year = ref.watch(yearProvider);
 
             return CarCardWidget(
               scrollController: scrollController,
               draggableController: draggableController,
               contentAnim: cardContentCtrl,
+              cardFraction: cardFraction,
+              year: year,
             );
-          },
+          });
+        },
+      ),
+    );
+  }
+
+  Widget buildCardInStack({
+    required BoxConstraints cons,
+    required double t,
+    required Widget child,
+  }) {
+    final offset = lerpDouble(cardStackOffset, 0, t)!;
+    final scale = lerpDouble(0.8, 1.0, t)!;
+    final height = cons.maxHeight * cardFraction + offset;
+    // adjustment for the scale transformation
+    final heightAdjustment = height / scale - height;
+
+    final fade = Curves.easeOut.transform(t);
+
+    return Positioned(
+      height: height + heightAdjustment,
+      left: 0,
+      right: 0,
+      bottom: -heightAdjustment,
+      child: Transform.scale(
+        scale: scale,
+        alignment: Alignment.topCenter,
+        child: ImageFiltered(
+          imageFilter: ColorFilter.matrix(<double>[
+            1, 0, 0, 0, 255 * (1 - fade), //
+            0, 1, 0, 0, 255 * (1 - fade), //
+            0, 0, 1, 0, 255 * (1 - fade), //
+            0, 0, 0, 1, 0, //
+          ]),
+          child: child,
         ),
       ),
     );
@@ -183,68 +313,69 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
         AnimatedBuilder(
           animation: swipeCtrl,
           builder: (context, child) {
-            final t = (swipeCtrl.value.abs() + i) / 3;
-            final offset = lerpDouble(30, 0, t)!;
-            final scale = lerpDouble(0.8, 1.0, t)!;
-            final height = cons.maxHeight * draggableMinSize + offset;
-            final heightAdjustment = height / scale - height;
+            double t =
+                swipeCtrl.value > 0 ? 1 - swipeCtrl.value : -swipeCtrl.value;
+            t = (t + i) / 3;
 
-            return Positioned(
-              height: height + heightAdjustment,
-              left: 0,
-              right: 0,
-              bottom: -heightAdjustment,
-              child: Transform.scale(
-                scale: scale,
-                alignment: Alignment.topCenter,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Color.lerp(
-                      Colors.grey.shade100,
-                      Colors.grey.shade400,
-                      t,
-                    ),
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
-                  ),
-                  child: switch (i) {
-                    2 when swipeCtrl.value != 0 => Opacity(
-                        opacity: swipeCtrl.value.abs(),
-                        child: CarCardWidget(
-                          scrollController: dummyScrollController,
-                          draggableController: dummyDraggableController,
-                          contentAnim: dummyAnimation,
-                        ),
-                      ),
-                    _ => null,
-                  },
-                ),
-              ),
+            return buildCardInStack(
+              cons: cons,
+              t: t,
+              child: child!,
             );
           },
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+            ),
+            child: AnimatedBuilder(
+                animation: swipeCtrl,
+                builder: (context, _) {
+                  return switch (i) {
+                    2 when swipeCtrl.value != 0 => Opacity(
+                        opacity: swipeCtrl.value.abs(),
+                        child: Consumer(builder: (context, ref, child) {
+                          final year = ref.watch(yearProvider) + 1;
+
+                          return CarCardWidget(
+                            scrollController: dummyScrollController,
+                            draggableController: dummyDraggableController,
+                            contentAnim: dummyAnimation,
+                            cardFraction: cardFraction,
+                            year: year,
+                          );
+                        }),
+                      ),
+                    _ => const SizedBox.shrink(),
+                  };
+                }),
+          ),
         ),
     ];
   }
 
-  Widget buildTimeline() {
-    return Consumer(builder: (context, ref, child) {
+  Widget buildTimeline(BoxConstraints cons) {
+    return Consumer(builder: (context, ref, _) {
+      final year = ref.watch(yearProvider);
+
       return AnimatedBuilder(
         animation: draggableController,
-        builder: (context, _) {
-          const height = 256.0;
+        builder: (context, child) {
+          final height = cons.maxHeight -
+              CarCardContentWidget.primaryContentHeight -
+              cardStackOffset;
           final t = remap(
-            draggableMinSize,
+            cardFraction,
             1,
             0,
             1,
             draggableController.isAttached
                 ? draggableController.size
-                : draggableMinSize,
+                : cardFraction,
           );
 
-          final year = ref.watch(yearProvider);
-          debugPrint('rebuildingWith year: ${year}');
           return Positioned(
             top: -height * t,
             left: 0,
@@ -262,23 +393,22 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
   }
 }
 
-class CarCardWidget extends StatefulWidget {
+class CarCardWidget extends StatelessWidget {
   const CarCardWidget({
     required this.scrollController,
     required this.draggableController,
     required this.contentAnim,
+    required this.cardFraction,
+    required this.year,
     super.key,
   });
 
   final ScrollController scrollController;
   final DraggableScrollableController draggableController;
   final Animation<double> contentAnim;
+  final double cardFraction;
+  final int year;
 
-  @override
-  State<CarCardWidget> createState() => _CarCardWidgetState();
-}
-
-class _CarCardWidgetState extends State<CarCardWidget> {
   @override
   Widget build(BuildContext context) {
     final padding = MediaQuery.paddingOf(context);
@@ -291,24 +421,24 @@ class _CarCardWidgetState extends State<CarCardWidget> {
         ),
       ),
       child: AnimatedBuilder(
-        animation: widget.draggableController,
+        animation: draggableController,
         builder: (context, child) {
           final progress = remap(
-            draggableMinSize,
+            cardFraction,
             1,
             0,
             1,
-            widget.draggableController.isAttached
-                ? widget.draggableController.size
-                : draggableMinSize,
+            draggableController.isAttached
+                ? draggableController.size
+                : cardFraction,
           );
 
           return CarCardContentWidget(
-            year: 1961,
+            carData: CarData.fromYear(year),
             expandProgress: progress,
             topPadding: padding.top,
-            scrollController: widget.scrollController,
-            contentAnim: widget.contentAnim,
+            scrollController: scrollController,
+            contentAnim: contentAnim,
           );
         },
       ),

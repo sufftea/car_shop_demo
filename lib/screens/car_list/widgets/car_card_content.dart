@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:car_shop/screens/car_list/data/car_list.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lorem_ipsum/lorem_ipsum.dart';
@@ -8,7 +9,7 @@ final lorem = loremIpsum(paragraphs: 2);
 
 class CarCardContentWidget extends StatelessWidget {
   const CarCardContentWidget({
-    required this.year,
+    required this.carData,
     required this.expandProgress,
     required this.topPadding,
     required this.scrollController,
@@ -16,7 +17,9 @@ class CarCardContentWidget extends StatelessWidget {
     super.key,
   });
 
-  final int year;
+  static const primaryContentHeight = 524.0;
+
+  final CarData carData;
   final double expandProgress;
   final double topPadding;
   final ScrollController scrollController;
@@ -48,7 +51,7 @@ class CarCardContentWidget extends StatelessWidget {
                       colors: const [Colors.white, Color(0xff0e0e0e)],
                       stops: [lerpDouble(0, 1, t)!, 0.9],
                       radius: heightFactor * 2 * t,
-                      center: const Alignment(0, 1.5),
+                      center: const Alignment(0, 2),
                     ),
                   ),
                 );
@@ -113,9 +116,7 @@ class CarCardContentWidget extends StatelessWidget {
                 Text(
                   (i + 1).toString(),
                   style: GoogleFonts.urbanist(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold
-                  ),
+                      fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 if (i == 0)
@@ -208,7 +209,7 @@ class CarCardContentWidget extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 32, right: 32),
       child: Text(
-        'Chevrolet Corvette C3',
+        carData.name,
         textAlign: TextAlign.start,
         style: GoogleFonts.cormorant(fontSize: 48, fontWeight: FontWeight.bold),
       ),
@@ -224,7 +225,7 @@ class CarCardContentWidget extends StatelessWidget {
             scale: lerpDouble(1, 2, contentAnim.value),
             alignment: Alignment.bottomLeft,
             child: Image.asset(
-              'assets/hotwheels.png',
+              carData.picturePath,
               alignment: Alignment.bottomCenter,
               width: cons.maxWidth - 64,
               height: 200,
@@ -246,7 +247,7 @@ class CarCardContentWidget extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              year.toString(),
+              carData.yearStart.toString(),
               // textHeightBehavior: TextHeightBehavior,
               style: GoogleFonts.urbanist(
                 height: 1,
@@ -256,7 +257,7 @@ class CarCardContentWidget extends StatelessWidget {
             ),
             const SizedBox(width: 16),
             Text(
-              "- ${(year + 9)}",
+              "- ${carData.yearEnd.toString()}",
               style: GoogleFonts.urbanist(
                 height: 1,
                 fontSize: 40,
