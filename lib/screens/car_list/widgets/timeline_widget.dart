@@ -20,8 +20,7 @@ class TimelineWidget extends StatefulWidget {
 }
 
 class _TimelineWidgetState extends State<TimelineWidget> {
-  static const _yearFraction = 0.20;
-  static const _scaleup = 1.2;
+  static const _yearFraction = 0.16;
 
   late final pageCtrl = PageController(
     initialPage: widget.year,
@@ -64,41 +63,32 @@ class _TimelineWidgetState extends State<TimelineWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned(
-          top: 0,
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(
-                  height: 64,
-                  child: Center(
-                    child: Text(
-                      'Timeline',
-                      style: GoogleFonts.urbanist(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            height: 48,
+            child: Center(
+              child: Text(
+                'Timeline',
+                style: GoogleFonts.urbanist(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
                 ),
-                Expanded(
-                  child: Transform.scale(
-                    scale: lerpDouble(_scaleup, 1, widget.expandProgress)!,
-                    child: buildYears(),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ],
+          Expanded(
+            child: Transform.scale(
+              scale: lerpDouble(1.5, 1, widget.expandProgress)!,
+              alignment: Alignment.center,
+              child: buildYears(),
+            ),
+          ),
+          const SizedBox(height: 48),
+        ],
+      ),
     );
   }
 
@@ -126,7 +116,7 @@ class _TimelineWidgetState extends State<TimelineWidget> {
                   Text(
                     index.toString(),
                     style: GoogleFonts.urbanist(
-                      fontSize: 30,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                       foreground: Paint()
                         ..style = PaintingStyle.stroke
@@ -137,7 +127,7 @@ class _TimelineWidgetState extends State<TimelineWidget> {
                   Text(
                     index.toString(),
                     style: GoogleFonts.urbanist(
-                      fontSize: 30,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                       foreground: Paint()
                         ..style = PaintingStyle.fill

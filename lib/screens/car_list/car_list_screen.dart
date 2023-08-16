@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:car_shop/screens/car_list/data/car_list.dart';
 import 'package:car_shop/screens/car_list/data/year_provider.dart';
 import 'package:car_shop/screens/car_list/widgets/car_card_content.dart';
 import 'package:car_shop/screens/car_list/widgets/timeline_widget.dart';
@@ -22,7 +21,7 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
     with TickerProviderStateMixin {
   static const cardStackOffset = 32.0;
 
-  final draggableSheetKey = GlobalKey();
+  // final draggableSheetKey = GlobalKey();
 
   // DUMMIES
   final dummyDraggableController = DraggableScrollableController();
@@ -30,7 +29,7 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
   late final dummyAnimation = AnimationController(vsync: this);
   // REGULAR STUFF
   final draggableController = DraggableScrollableController();
-  ScrollController? cardScrollController;
+  // ScrollController? cardScrollController;
   late final swipeCtrl = AnimationController(
     lowerBound: -1.0,
     upperBound: 1.0,
@@ -106,8 +105,7 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: LayoutBuilder(builder: (context, cons) {
-        cardFraction =
-            CarCardContentWidget.primaryContentHeight / cons.maxHeight;
+        cardFraction = CarCardWidget.contentHeight / cons.maxHeight;
 
         return Stack(
           fit: StackFit.expand,
@@ -128,7 +126,6 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
                   t: t - 1,
                   child: Consumer(builder: (context, ref, child) {
                     final year = ref.watch(yearProvider);
-
                     return CarCardWidget(
                       scrollController: dummyScrollController,
                       draggableController: draggableController,
@@ -152,7 +149,7 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
       bottom: 0,
       right: 0,
       left: 0,
-      height: CarCardContentWidget.primaryContentHeight,
+      height: CarCardWidget.contentHeight,
       child: AnimatedBuilder(
         animation: cardOpenedNotifier,
         builder: (context, child) {
@@ -200,7 +197,7 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
       bottom: -plusHeight,
       left: cons.maxWidth * t,
       width: cons.maxWidth,
-      height: CarCardContentWidget.primaryContentHeight + plusHeight,
+      height: CarCardWidget.contentHeight + plusHeight,
       child: Transform.rotate(
         angle: pi / 8 * t,
         origin: const Offset(0, 500),
@@ -221,7 +218,7 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
           );
         }
 
-        final dummyChild = Consumer(builder: (context, ref, child) {
+        final dummyChild = Consumer(builder: (context, ref, _) {
           final year = ref.watch(yearProvider);
 
           return CarCardWidget(
@@ -247,7 +244,7 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
         );
       },
       child: DraggableScrollableSheet(
-        key: draggableSheetKey,
+        // key: draggableSheetKey,
         expand: false,
         snap: true,
         minChildSize: cardFraction,
@@ -255,8 +252,6 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
         snapAnimationDuration: const Duration(milliseconds: 200),
         controller: draggableController,
         builder: (context, scrollController) {
-          cardScrollController = scrollController;
-
           return Consumer(builder: (context, ref, child) {
             final year = ref.watch(yearProvider);
 
@@ -363,9 +358,8 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
       return AnimatedBuilder(
         animation: draggableController,
         builder: (context, child) {
-          final height = cons.maxHeight -
-              CarCardContentWidget.primaryContentHeight -
-              cardStackOffset;
+          final height =
+              cons.maxHeight - CarCardWidget.contentHeight - cardStackOffset;
           final t = remap(
             cardFraction,
             1,
@@ -390,58 +384,5 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
         },
       );
     });
-  }
-}
-
-class CarCardWidget extends StatelessWidget {
-  const CarCardWidget({
-    required this.scrollController,
-    required this.draggableController,
-    required this.contentAnim,
-    required this.cardFraction,
-    required this.year,
-    super.key,
-  });
-
-  final ScrollController scrollController;
-  final DraggableScrollableController draggableController;
-  final Animation<double> contentAnim;
-  final double cardFraction;
-  final int year;
-
-  @override
-  Widget build(BuildContext context) {
-    final padding = MediaQuery.paddingOf(context);
-
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: const BoxDecoration(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(16),
-        ),
-      ),
-      child: AnimatedBuilder(
-        animation: draggableController,
-        builder: (context, child) {
-          final progress = remap(
-            cardFraction,
-            1,
-            0,
-            1,
-            draggableController.isAttached
-                ? draggableController.size
-                : cardFraction,
-          );
-
-          return CarCardContentWidget(
-            carData: CarData.fromYear(year),
-            expandProgress: progress,
-            topPadding: padding.top,
-            scrollController: scrollController,
-            contentAnim: contentAnim,
-          );
-        },
-      ),
-    );
   }
 }

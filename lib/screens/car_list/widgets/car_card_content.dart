@@ -1,68 +1,77 @@
 import 'dart:ui';
 
 import 'package:car_shop/screens/car_list/data/car_list.dart';
+import 'package:car_shop/utils/utils.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lorem_ipsum/lorem_ipsum.dart';
 
 final lorem = loremIpsum(paragraphs: 2);
 
-class CarCardContentWidget extends StatelessWidget {
-  const CarCardContentWidget({
-    required this.carData,
-    required this.expandProgress,
-    required this.topPadding,
+class CarCardWidget extends StatefulWidget {
+  CarCardWidget({
     required this.scrollController,
+    required this.draggableController,
     required this.contentAnim,
+    required this.cardFraction,
+    required int year,
     super.key,
-  });
+  }) : carData = CarData.fromYear(year);
 
-  static const primaryContentHeight = 524.0;
+  static const contentHeight = 550.0;
 
-  final CarData carData;
-  final double expandProgress;
-  final double topPadding;
   final ScrollController scrollController;
+  final DraggableScrollableController draggableController;
   final Animation<double> contentAnim;
+  final double cardFraction;
+  final CarData carData;
 
-  double get appBarSize {
-    return lerpDouble(
+  @override
+  State<CarCardWidget> createState() => _CarCardWidgetState();
+}
+
+class _CarCardWidgetState extends State<CarCardWidget> {
+  double topSafeArea = 0;
+
+  /// Scroll offset at the time when the drag with handle started
+  double dragStartScrollOffset = 0;
+
+  double calculateExpandProgress() {
+    final t = remap(
+      widget.cardFraction,
+      1,
       0,
-      topPadding,
-      expandProgress,
-    )!;
+      1,
+      widget.draggableController.isAttached
+          ? widget.draggableController.size
+          : widget.cardFraction,
+    );
+    return t;
   }
 
   @override
   Widget build(BuildContext context) {
+    topSafeArea = MediaQuery.paddingOf(context).top;
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(16),
+        ),
+      ),
+      child: buildStack(),
+    );
+  }
+
+  Widget buildStack() {
     return Stack(
       children: [
-        Positioned.fill(
-          child: LayoutBuilder(builder: (context, cons) {
-            return AnimatedBuilder(
-              animation: contentAnim,
-              builder: (context, child) {
-                final t = contentAnim.value;
-                final heightFactor = cons.maxHeight / cons.maxWidth;
-
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: const [Colors.white, Color(0xff0e0e0e)],
-                      stops: [lerpDouble(0, 1, t)!, 0.9],
-                      radius: heightFactor * 2 * t,
-                      center: const Alignment(0, 2),
-                    ),
-                  ),
-                );
-              },
-            );
-          }),
-        ),
+        buildGradient(),
         Positioned.fill(
           child: CustomScrollView(
-            primary: false,
-            controller: scrollController,
+            // primary: false,
+            controller: widget.scrollController,
             slivers: [
               SliverToBoxAdapter(
                 child: buildContent(),
@@ -70,26 +79,160 @@ class CarCardContentWidget extends StatelessWidget {
             ],
           ),
         ),
+        buildHandle(),
       ],
+    );
+  }
+
+  Widget buildHandle() {
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        widget.draggableController,
+        widget.contentAnim,
+      ]),
+      builder: (context, child) {
+        final t = calculateExpandProgress();
+        return Positioned(
+          top: 0,
+          right: 0,
+          left: 0,
+          child: GestureDetector(
+            onVerticalDragStart: (details) {
+              dragStartScrollOffset = widget.scrollController.offset;
+            },
+            onVerticalDragUpdate: (details) {
+              final c = widget.draggableController;
+              final destination =
+                  c.pixelsToSize(c.pixels - details.primaryDelta!);
+
+              final sc = widget.scrollController;
+              if (destination <= 1) {
+                c.jumpTo(destination);
+
+                final t = remap(widget.cardFraction, 1, 0, 1, destination);
+                sc.jumpTo(dragStartScrollOffset * t);
+              }
+            },
+            onVerticalDragEnd: (details) {
+              final c = widget.draggableController;
+
+              if (c.size < (widget.cardFraction + 1) / 2) {
+                c.animateTo(
+                  widget.cardFraction,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                );
+              } else {
+                c.animateTo(
+                  1,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                );
+              }
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: switch ((
+                  widget.contentAnim.isCompleted,
+                  widget.scrollController.positions.first.pixels == 0
+                )) {
+                  (false, true) => Colors.transparent,
+                  (false, false) =>
+                    Colors.white.withOpacity(widget.contentAnim.value),
+                  _ => Colors.white,
+                },
+                border: Border(
+                  bottom: BorderSide(
+                    color: Color.lerp(
+                      Colors.transparent,
+                      Colors.black,
+                      t,
+                    )!,
+                  ),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: lerpDouble(0, topSafeArea, t),
+                  ),
+                  SizedBox(
+                    height: lerpDouble(24, 64, t),
+                    child: Center(
+                      child: Container(
+                        height: 4,
+                        width: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.grey,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Positioned buildGradient() {
+    return Positioned.fill(
+      child: LayoutBuilder(builder: (context, cons) {
+        return AnimatedBuilder(
+          animation:
+              widget.contentAnim.drive(CurveTween(curve: Curves.easeOutQuart)),
+          builder: (context, child) {
+            final t = widget.contentAnim.value;
+            final heightFactor = cons.maxHeight / cons.maxWidth;
+
+            return Container(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  colors: const [Colors.white, Color(0xff0e0e0e)],
+                  stops: [lerpDouble(0, 1, t)!, 0.9],
+                  radius: heightFactor * 2 * t,
+                  center: const Alignment(0, 2),
+                ),
+              ),
+            );
+          },
+        );
+      }),
     );
   }
 
   Widget buildContent() {
     return AnimatedBuilder(
-      animation: contentAnim,
+      animation: widget.contentAnim,
       builder: (context, child) {
         return DefaultTextStyle.merge(
           style: TextStyle(
-            color: Color.lerp(Colors.white, Colors.black, contentAnim.value),
+            color: Color.lerp(
+              Colors.white,
+              Colors.black,
+              widget.contentAnim.value,
+            ),
           ),
           child: child!,
         );
       },
       child: Column(
         children: [
-          SizedBox(
-            height: 32 + appBarSize,
+          AnimatedBuilder(
+            animation: widget.draggableController,
+            builder: (context, child) {
+              final t = calculateExpandProgress();
+              return SizedBox(
+                height: lerpDouble(24, topSafeArea + 64, t),
+              );
+            },
           ),
+          const SizedBox(height: 16),
           buildYears(),
           buildCar(),
           buildImageSlideIndicator(),
@@ -194,10 +337,13 @@ class CarCardContentWidget extends StatelessWidget {
             thickness: 1,
             color: Colors.black,
           ),
-          Text(
-            lorem,
-            style: const TextStyle(
-              fontSize: 18,
+          Padding(
+            padding: const EdgeInsets.only(right: 32),
+            child: Text(
+              lorem,
+              style: const TextStyle(
+                fontSize: 18,
+              ),
             ),
           ),
         ],
@@ -209,7 +355,7 @@ class CarCardContentWidget extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 32, right: 32),
       child: Text(
-        carData.name,
+        widget.carData.name,
         textAlign: TextAlign.start,
         style: GoogleFonts.cormorant(fontSize: 48, fontWeight: FontWeight.bold),
       ),
@@ -219,13 +365,14 @@ class CarCardContentWidget extends StatelessWidget {
   Widget buildCar() {
     return LayoutBuilder(builder: (context, cons) {
       return AnimatedBuilder(
-        animation: contentAnim.drive(CurveTween(curve: Curves.easeInOutCubic)),
+        animation:
+            widget.contentAnim.drive(CurveTween(curve: Curves.easeInOutCubic)),
         builder: (context, child) {
           return Transform.scale(
-            scale: lerpDouble(1, 2, contentAnim.value),
+            scale: lerpDouble(1, 2, widget.contentAnim.value),
             alignment: Alignment.bottomLeft,
             child: Image.asset(
-              carData.picturePath,
+              widget.carData.picturePath,
               alignment: Alignment.bottomCenter,
               width: cons.maxWidth - 64,
               height: 200,
@@ -247,7 +394,7 @@ class CarCardContentWidget extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              carData.yearStart.toString(),
+              widget.carData.yearStart.toString(),
               // textHeightBehavior: TextHeightBehavior,
               style: GoogleFonts.urbanist(
                 height: 1,
@@ -257,7 +404,7 @@ class CarCardContentWidget extends StatelessWidget {
             ),
             const SizedBox(width: 16),
             Text(
-              "- ${carData.yearEnd.toString()}",
+              "- ${widget.carData.yearEnd.toString()}",
               style: GoogleFonts.urbanist(
                 height: 1,
                 fontSize: 40,
@@ -272,5 +419,16 @@ class CarCardContentWidget extends StatelessWidget {
         ),
       );
     });
+  }
+}
+
+class CustomTween<T> extends Animatable<T> {
+  const CustomTween(this.customTransform);
+
+  final T Function(double t) customTransform;
+
+  @override
+  T transform(double t) {
+    return customTransform(t);
   }
 }
