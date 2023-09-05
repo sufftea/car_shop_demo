@@ -30,7 +30,6 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
   late final dummyAnimation = AnimationController(vsync: this);
   // REGULAR STUFF
   final draggableController = DraggableScrollableController();
-  // ScrollController? cardScrollController;
   late final swipeCtrl = AnimationController(
     lowerBound: -1.0,
     upperBound: 1.0,
@@ -68,10 +67,9 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
   }
 
   void onDraggableUpdate() {
-    final currentSize = draggableController.sizeToPixels(1);
+    final maxSize = draggableController.sizeToPixels(1);
 
-    if (draggableController.pixels >=
-        (currentSize.isFinite ? currentSize.floor() : double.infinity)) {
+    if (maxSize.isFinite && draggableController.pixels >= maxSize.floor()) {
       cardContentCtrl.forward();
       WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
         cardOpenedNotifier.value = true;
@@ -88,7 +86,6 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
       );
 
       cardContentCtrl.value = t;
-
       WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
         cardOpenedNotifier.value = false;
       });
@@ -229,29 +226,37 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
           );
         }
 
-        final dummyChild = Consumer(builder: (context, ref, _) {
-          final year = ref.watch(yearProvider);
-
-          return CarCardWidget(
-            scrollController: dummyScrollController,
-            draggableController: dummyDraggableController,
-            contentAnim: dummyAnimation,
-            cardFraction: cardFraction,
-            year: year,
-          );
-        });
-
         if (t > 0) {
           return buildCardInStack(
             cons: cons,
             t: 1 - t / 3,
-            child: dummyChild,
+            child: Consumer(builder: (context, ref, _) {
+              final year = ref.watch(yearProvider) - 1;
+
+              return CarCardWidget(
+                scrollController: dummyScrollController,
+                draggableController: dummyDraggableController,
+                contentAnim: dummyAnimation,
+                cardFraction: cardFraction,
+                year: year,
+              );
+            }),
           );
         }
         return buildSlidingCard(
           cons: cons,
           t: t,
-          child: dummyChild,
+          child: Consumer(builder: (context, ref, _) {
+            final year = ref.watch(yearProvider);
+
+            return CarCardWidget(
+              scrollController: dummyScrollController,
+              draggableController: dummyDraggableController,
+              contentAnim: dummyAnimation,
+              cardFraction: cardFraction,
+              year: year,
+            );
+          }),
         );
       },
       child: DraggableScrollableSheet(
@@ -290,8 +295,6 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
     // adjustment for the scale transformation
     final heightAdjustment = height / scale - height;
 
-    final fade = Curves.easeOut.transform(t);
-
     return Positioned(
       height: height + heightAdjustment,
       left: 0,
@@ -300,15 +303,7 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
       child: Transform.scale(
         scale: scale,
         alignment: Alignment.topCenter,
-        child: ImageFiltered(
-          imageFilter: ColorFilter.matrix(<double>[
-            1, 0, 0, 0, 255 * (1 - fade), //
-            0, 1, 0, 0, 255 * (1 - fade), //
-            0, 0, 1, 0, 255 * (1 - fade), //
-            0, 0, 0, 1, 0, //
-          ]),
-          child: child,
-        ),
+        child: child,
       ),
     );
   }
@@ -326,38 +321,43 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
             return buildCardInStack(
               cons: cons,
               t: t,
-              child: child!,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Color.lerp(
+                      Colors.white, Colors.black, Curves.easeOut.transform(t)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
+                ),
+                child: AnimatedBuilder(
+                    animation: swipeCtrl,
+                    builder: (context, _) {
+                      return switch (i) {
+                        2 when swipeCtrl.value != 0 =>
+                          Consumer(builder: (context, ref, child) {
+                            final year = ref.watch(yearProvider) + 1;
+
+                            return Stack(
+                              children: [
+                                CarCardWidget(
+                                  scrollController: dummyScrollController,
+                                  draggableController: dummyDraggableController,
+                                  contentAnim: dummyAnimation,
+                                  cardFraction: cardFraction,
+                                  year: year,
+                                ),
+                                Container(
+                                  color: Colors.white.withOpacity(1 - t),
+                                ),
+                              ],
+                            );
+                          }),
+                        _ => const SizedBox.shrink(),
+                      };
+                    }),
+              ),
             );
           },
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.black,
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(16),
-              ),
-            ),
-            child: AnimatedBuilder(
-                animation: swipeCtrl,
-                builder: (context, _) {
-                  return switch (i) {
-                    2 when swipeCtrl.value != 0 => Opacity(
-                        opacity: swipeCtrl.value.abs(),
-                        child: Consumer(builder: (context, ref, child) {
-                          final year = ref.watch(yearProvider) + 1;
-
-                          return CarCardWidget(
-                            scrollController: dummyScrollController,
-                            draggableController: dummyDraggableController,
-                            contentAnim: dummyAnimation,
-                            cardFraction: cardFraction,
-                            year: year,
-                          );
-                        }),
-                      ),
-                    _ => const SizedBox.shrink(),
-                  };
-                }),
-          ),
         ),
     ];
   }
