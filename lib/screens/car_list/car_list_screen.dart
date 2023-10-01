@@ -132,7 +132,7 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
                     cons: cons,
                     t: t - 1,
                     child: Consumer(builder: (context, ref, child) {
-                      final year = ref.watch(yearProvider);
+                      final year = ref.watch(yearProvider) - 1;
                       return CarCardWidget(
                         scrollController: dummyScrollController,
                         draggableController: draggableController,
@@ -226,13 +226,14 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
           );
         }
 
+        debugPrint('t = $t');
         if (t > 0) {
           return buildCardInStack(
             cons: cons,
             t: 1 - t / 3,
             child: Consumer(builder: (context, ref, _) {
-              final year = ref.watch(yearProvider) - 1;
-
+              final year = ref.watch(yearProvider);
+              debugPrint('rebuilding front card');
               return CarCardWidget(
                 scrollController: dummyScrollController,
                 draggableController: dummyDraggableController,
