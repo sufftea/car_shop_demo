@@ -22,13 +22,11 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
     with TickerProviderStateMixin {
   static const cardStackOffset = 32.0;
 
-  // final draggableSheetKey = GlobalKey();
-
-  // DUMMIES
+  
   final dummyDraggableController = DraggableScrollableController();
   final dummyScrollController = ScrollController();
   late final dummyAnimation = AnimationController(vsync: this);
-  // REGULAR STUFF
+  
   final draggableController = DraggableScrollableController();
   late final swipeCtrl = AnimationController(
     lowerBound: -1.0,
@@ -226,22 +224,38 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
           );
         }
 
-        debugPrint('t = $t');
         if (t > 0) {
+          debugPrint('t = $t');
           return buildCardInStack(
             cons: cons,
             t: 1 - t / 3,
-            child: Consumer(builder: (context, ref, _) {
-              final year = ref.watch(yearProvider);
-              debugPrint('rebuilding front card');
-              return CarCardWidget(
-                scrollController: dummyScrollController,
-                draggableController: dummyDraggableController,
-                contentAnim: dummyAnimation,
-                cardFraction: cardFraction,
-                year: year,
-              );
-            }),
+            child: Stack(
+              children: [
+                Consumer(builder: (context, ref, _) {
+                  final year = ref.watch(yearProvider);
+                  return CarCardWidget(
+                    scrollController: dummyScrollController,
+                    draggableController: dummyDraggableController,
+                    contentAnim: dummyAnimation,
+                    cardFraction: cardFraction,
+                    year: year,
+                  );
+                }),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Color.lerp(
+                      Colors.white,
+                      Colors.black,
+                      Curves.easeOut.transform(2 / 3),
+                    )!
+                        .withOpacity(t),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           );
         }
         return buildSlidingCard(
@@ -261,7 +275,6 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
         );
       },
       child: DraggableScrollableSheet(
-        // key: draggableSheetKey,
         expand: false,
         snap: true,
         minChildSize: cardFraction,
@@ -330,32 +343,37 @@ class _CarListScreenState extends ConsumerState<CarListScreen>
                     top: Radius.circular(16),
                   ),
                 ),
-                child: AnimatedBuilder(
-                    animation: swipeCtrl,
-                    builder: (context, _) {
-                      return switch (i) {
-                        2 when swipeCtrl.value != 0 =>
-                          Consumer(builder: (context, ref, child) {
-                            final year = ref.watch(yearProvider) + 1;
+                child: switch (i) {
+                  2 => Consumer(builder: (context, ref, child) {
+                      final year = ref.watch(yearProvider) + 1;
 
-                            return Stack(
-                              children: [
-                                CarCardWidget(
-                                  scrollController: dummyScrollController,
-                                  draggableController: dummyDraggableController,
-                                  contentAnim: dummyAnimation,
-                                  cardFraction: cardFraction,
-                                  year: year,
-                                ),
-                                Container(
-                                  color: Colors.white.withOpacity(1 - t),
-                                ),
-                              ],
-                            );
-                          }),
-                        _ => const SizedBox.shrink(),
-                      };
+                      return Stack(
+                        children: [
+                          CarCardWidget(
+                            scrollController: dummyScrollController,
+                            draggableController: dummyDraggableController,
+                            contentAnim: dummyAnimation,
+                            cardFraction: cardFraction,
+                            year: year,
+                          ),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Color.lerp(
+                                Colors.white,
+                                Colors.black,
+                                Curves.easeOut.transform(2 / 3),
+                              )!
+                                  .withOpacity(1 - remap(2 / 3, 1, 0, 1, t)),
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
                     }),
+                  _ => null,
+                },
               ),
             );
           },
